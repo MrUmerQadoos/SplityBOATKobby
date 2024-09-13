@@ -1,0 +1,292 @@
+datasource db {
+  provider = "mongodb"
+  url      = "mongodb+srv://umerqudooscortechsols:Wi7cNnzvzoiK9AjZ@cluster0.wsdd7.mongodb.net/IMAGESPLITDITYBOAT"
+}
+
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "rhel-openssl-1.0.x"]
+}
+
+model User {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  email     String   @unique
+  username  String?  @unique
+  password  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model LocalUser {
+  id        String    @id @default(auto()) @map("_id") @db.ObjectId
+  email     String    @unique
+  name      String
+  password  String
+  otp       String? // New field for storing the OTP
+  otpExpiry DateTime? // New field for storing OTP expiry time
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model Accommodation {
+  id                   String                @id @default(auto()) @map("_id") @db.ObjectId
+  title                String
+  description          String
+  about                String
+  rating               Float? // For numeric values
+  prices               Price[] // Embedded prices
+  ageRestrictions      AgeRestriction[] // Embedded age restrictions
+  termsConditions      TermsCondition[] // Embedded terms and conditions
+  cancellationPolicies CancellationPolicy[] // Embedded cancellation policies
+  openingTimes         OpeningTime[] // Embedded opening times
+  images               Image[] // Embedded images (array of objects)
+  locations            Location[] // Embedded locations (array of objects)
+  accomodatiotype      String?
+  reviews              AccommodationReview[] // No onDelete here
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+}
+
+model AccommodationReview {
+  id              String        @id @default(auto()) @map("_id") @db.ObjectId
+  accommodationId String        @db.ObjectId
+  rating          Float?
+  reviewTitle     String
+  reviewText      String
+  visitMonth      String
+  visitType       String
+  email           String
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  accommodation   Accommodation @relation(fields: [accommodationId], references: [id], onDelete: Cascade) // onDelete specified here
+}
+
+model Itinerary {
+  id                   String               @id @default(auto()) @map("_id") @db.ObjectId
+  title                String
+  description          String
+  about                String
+  rating               Float? // For numeric values
+  prices               Price[] // Embedded prices
+  ageRestrictions      AgeRestriction[] // Embedded age restrictions
+  termsConditions      TermsCondition[] // Embedded terms and conditions
+  cancellationPolicies CancellationPolicy[] // Embedded cancellation policies
+  openingTimes         OpeningTime[] // Embedded opening times
+  images               Image[] // Embedded images (array of objects)
+  locations            Location[] // Embedded locations (array of objects)
+  categories           String?
+  reviews              ItineraryReview[] // No onDelete here
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+}
+
+model InStaGallery {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  imageUrl  String
+  source    String // 'instagram' or 'upload'
+  postUrl   String? // Instagram post URL if applicable
+  caption   String?
+  mediaType String?
+  timestamp DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+
+model ItineraryReview {
+  id          String    @id @default(auto()) @map("_id") @db.ObjectId
+  itineraryId String    @db.ObjectId
+  rating      Float?
+  reviewTitle String
+  reviewText  String
+  visitMonth  String
+  visitType   String
+  email       String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  Itinerary   Itinerary @relation(fields: [itineraryId], references: [id], onDelete: Cascade) // onDelete specified here
+}
+
+model AccommodationType {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Category {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model PlaceToVisit {
+  id         String       @id @default(auto()) @map("_id") @db.ObjectId
+  explore    Explore[]
+  experience Experience[]
+  gallery    Gallery
+  // Slider for PlaceToVisit
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+}
+
+type Explore {
+  id    Int // Fixed ID (1, 2, 3, 4) - Used for updating specific images
+  image String
+  title String
+}
+
+type Experience {
+  id    Int // Fixed ID (1, 2, 3, 4) - Used for updating specific images
+  image String
+  title String
+}
+
+type Gallery {
+  images String[] // Dynamic array of image URLs
+}
+
+model ThingTodoSlider {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  slider    Slider[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model PlacesToVisitSlider {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  slider    Slider[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model FindAccommodationSlider {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  slider    Slider[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model PlanYourTripSlider {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  slider    Slider[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+type Slider {
+  url String
+}
+
+model ThingsTodo {
+  id             String           @id @default(auto()) @map("_id") @db.ObjectId
+  topAttractions TopAttractions[]
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+}
+
+type TopAttractions {
+  id    Int // Fixed ID (1, 2, 3, 4) - Used for updating specific images
+  image String
+  title String
+}
+
+model FindAccommodation {
+  id              String            @id @default(auto()) @map("_id") @db.ObjectId
+  topplacestovist Topplacestovist[]
+  thingstoSee     ThingstoSee[]
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+}
+
+// MY CODE OF MODEL..Find a special place to stay
+
+model AccommodationDesc {
+  id                     String                   @id @default(auto()) @map("_id") @db.ObjectId
+  findspecialplacetostay FindSpecialPlaceToStay[]
+  createdAt              DateTime                 @default(now())
+  updatedAt              DateTime                 @updatedAt
+}
+
+type FindSpecialPlaceToStay {
+  id    Int
+  image String
+  title String
+}
+
+model AccomDescSlider {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  slider    Slider[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// MY CODE ENDED HERE..
+
+type Topplacestovist {
+  id    Int // Fixed ID (1, 2, 3, 4) - Used for updating specific images
+  image String
+  title String
+}
+
+type ThingstoSee {
+  id    Int // Fixed ID (1, 2, 3, 4) - Used for updating specific images
+  image String
+  title String
+}
+
+model PlanYourTrip {
+  id                  String                @id @default(auto()) @map("_id") @db.ObjectId
+  topplacestovistPlan TopplacestovistPlan[]
+  mayIntrested        MayIntrested[]
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+}
+
+type TopplacestovistPlan {
+  id    Int // Fixed ID (1, 2, 3, 4) - Used for updating specific images
+  image String
+  title String
+}
+
+type MayIntrested {
+  id    Int // Fixed ID (1, 2, 3, 4) - Used for updating specific images
+  image String
+  title String
+}
+
+type Price {
+  category String
+  name     String
+  value    String
+}
+
+type AgeRestriction {
+  description String
+}
+
+type TermsCondition {
+  description String
+}
+
+type CancellationPolicy {
+  description String
+}
+
+type OpeningTime {
+  openingTime String
+  closingTime String
+  startMonth  String?
+  endMonth    String?
+}
+
+type Image {
+  url String
+}
+
+type Location {  
+  lat     Float?
+  lng     Float?
+  address String
+}
