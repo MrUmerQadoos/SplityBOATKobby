@@ -111,18 +111,16 @@ const SliderWithBanner = forwardRef(({ imageUrls = [], onUpload }, ref) => {
     [onUpload]
   )
 
+  // Function to handle card deletion
   const handleDeleteCard = (index) => {
-    // Remove the card at the given index
     const updatedCards = cards.filter((_, i) => i !== index)
     setCards(updatedCards)
 
-    // Remove the corresponding image URL
     const updatedImageUrls = allImageUrls.filter((_, i) => i !== index)
     setAllImageUrls(updatedImageUrls)
     imageUrlsRef.current = updatedImageUrls
 
-    // Update the parent component (or wherever the onUpload callback is used)
-    onUpload(updatedImageUrls)
+    onUpload(updatedImageUrls) // Update the parent component with the new list of image URLs
   }
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
@@ -137,7 +135,7 @@ const SliderWithBanner = forwardRef(({ imageUrls = [], onUpload }, ref) => {
           <Grid item xs={12} sm={6} md={4} key={index}>
             <BannnerCard
               file={file}
-              onDelete={() => handleDeleteCard(index)} // Use the handleDeleteCard function
+              onDelete={() => handleDeleteCard(index)} // Call the delete function on clicking delete
               onPreview={() => console.log('Preview image or video')}
             />
           </Grid>
@@ -172,11 +170,6 @@ const SliderWithBanner = forwardRef(({ imageUrls = [], onUpload }, ref) => {
 })
 
 export default SliderWithBanner
-
-
-
-
-
 
 
 
