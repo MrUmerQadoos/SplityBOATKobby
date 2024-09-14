@@ -1,3 +1,195 @@
+import { useState, useCallback, useRef, useEffect, forwardRef, useImperativeHandle } from 'react'
+import Grid from '@mui/material/Grid'
+import Card from '@mui/material/Card'
+import CircularProgress from '@mui/material/CircularProgress'
+import { IoAddCircleSharp } from 'react-icons/io5'
+import { useDropzone } from 'react-dropzone'
+import { toast } from 'react-hot-toast'
+import BannnerCard from './BannnerCard'
+
+const MAX_VIDEO_SIZE_MB = 500 * 1024 * 1024 // 500MB limit
+
+const SliderWithBanner = forwardRef(({ imageUrls = [], onUpload }, ref) => {
+  const [cards, setCards] = useState([])
+  const [allImageUrls, setAllImageUrls] = useState(imageUrls)
+  const [isUploading, setIsUploading] = useState(false)
+  const imageUrlsRef = useRef(allImageUrls)
+
+  // Expose methods via ref (for validateImages and resetSlider)
+  useImperativeHandle(ref, () => ({
+    validateImages() {
+      if (imageUrlsRef.current.length === 0) {
+        toast.error('Please upload at least one image or video before submitting.')
+        return false
+      }
+      return true
+    },
+    resetSlider() {
+      setCards([])
+      setAllImageUrls([])
+      imageUrlsRef.current = []
+      onUpload([])
+      setIsUploading(false)
+    }
+  }))
+
+  useEffect(() => {
+    if (imageUrls.length > 0) {
+      const existingCards = imageUrls.map(url => ({
+        preview: url,
+        type: url.match(/\.(jpeg|jpg|gif|png|webp)$/i) ? 'image' : 'video'
+      }))
+      setCards(existingCards)
+      setAllImageUrls(imageUrls)
+      imageUrlsRef.current = imageUrls
+    }
+  }, [imageUrls])
+
+  const onDrop = useCallback(
+    async acceptedFiles => {
+      setIsUploading(true)
+      const newImageUrls = []
+
+      await Promise.all(
+        acceptedFiles.map(async file => {
+          if (file.size > MAX_VIDEO_SIZE_MB) {
+            toast.error('File size exceeds 500MB. Please upload a smaller file.')
+            return
+          }
+
+          try {
+            // Fetch the pre-signed URL and public URL from your API
+            const response = await fetch('/api/upload-url', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ filename: file.name })
+            })
+
+            const { url, fileUrl } = await response.json()
+
+            // Upload the file to Cloudflare R2 using the pre-signed URL
+            const uploadRes = await fetch(url, {
+              method: 'PUT',
+              body: file,
+              headers: {
+                'Content-Type': file.type
+              }
+            })
+
+            if (uploadRes.ok) {
+              console.log('File uploaded successfully: ', fileUrl)
+
+              newImageUrls.push(fileUrl)
+
+              // Update image URLs
+              setAllImageUrls(prevUrls => {
+                const updatedUrls = [...prevUrls, fileUrl]
+                imageUrlsRef.current = updatedUrls
+                onUpload(updatedUrls) // Call the onUpload callback
+                return updatedUrls
+              })
+
+              // Update cards with preview
+              setCards(prevCards => [
+                ...prevCards,
+                { preview: URL.createObjectURL(file), type: file.type.includes('video') ? 'video' : 'image' }
+              ])
+
+              toast.success(`Uploaded: ${file.name}`)
+            } else {
+              toast.error('Upload failed')
+            }
+          } catch (error) {
+            console.error('Error uploading file:', error)
+            toast.error('Upload error')
+          }
+        })
+      )
+
+      setIsUploading(false)
+    },
+    [onUpload]
+  )
+
+  const handleDeleteCard = (index) => {
+    // Remove the card at the given index
+    const updatedCards = cards.filter((_, i) => i !== index)
+    setCards(updatedCards)
+
+    // Remove the corresponding image URL
+    const updatedImageUrls = allImageUrls.filter((_, i) => i !== index)
+    setAllImageUrls(updatedImageUrls)
+    imageUrlsRef.current = updatedImageUrls
+
+    // Update the parent component (or wherever the onUpload callback is used)
+    onUpload(updatedImageUrls)
+  }
+
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop,
+    accept: 'image/*,video/*'
+  })
+
+  return (
+    <div style={{ padding: '20px' }}>
+      <Grid container spacing={3}>
+        {cards.map((file, index) => (
+          <Grid item xs={12} sm={6} md={4} key={index}>
+            <BannnerCard
+              file={file}
+              onDelete={() => handleDeleteCard(index)} // Use the handleDeleteCard function
+              onPreview={() => console.log('Preview image or video')}
+            />
+          </Grid>
+        ))}
+        <Grid item xs={12} sm={6} md={4}>
+          <Card
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              border: '2px dotted #ddd',
+              borderRadius: '12px',
+              cursor: isUploading ? 'not-allowed' : 'pointer',
+              minHeight: '200px'
+            }}
+            {...getRootProps()}
+          >
+            <input {...getInputProps()} />
+            {isUploading ? (
+              <CircularProgress />
+            ) : (
+              <>
+                {isDragActive ? <p>Drop the files here ...</p> : <p>Drag & Upload</p>}
+                <IoAddCircleSharp style={{ fontSize: '36px', color: '#4a90e2' }} />
+              </>
+            )}
+          </Card>
+        </Grid>
+      </Grid>
+    </div>
+  )
+})
+
+export default SliderWithBanner
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 // import { useState, useCallback, useRef, useEffect, forwardRef, useImperativeHandle } from 'react'
 // import Grid from '@mui/material/Grid'
@@ -179,214 +371,214 @@
 
 
 
-import { useState, useCallback, useEffect, forwardRef, useImperativeHandle, useRef, useMemo } from 'react';
-import Grid from '@mui/material/Grid';
-import Card from '@mui/material/Card';
-import CircularProgress from '@mui/material/CircularProgress';
-import { IoAddCircleSharp } from 'react-icons/io5';
-import { useDropzone } from 'react-dropzone';
-import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
-import BannnerCard from './BannnerCard';
-import { toast } from 'react-hot-toast';
+// // import { useState, useCallback, useEffect, forwardRef, useImperativeHandle, useRef, useMemo } from 'react';
+// // import Grid from '@mui/material/Grid';
+// // import Card from '@mui/material/Card';
+// // import CircularProgress from '@mui/material/CircularProgress';
+// // import { IoAddCircleSharp } from 'react-icons/io5';
+// // import { useDropzone } from 'react-dropzone';
+// // import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+// // import BannnerCard from './BannnerCard';
+// // import { toast } from 'react-hot-toast';
 
-const MAX_VIDEO_SIZE_MB = 100 * 1024 * 1024; // 100MB
+// // const MAX_VIDEO_SIZE_MB = 100 * 1024 * 1024; // 100MB
 
-const SliderWithBanner = forwardRef(({ imageUrls = [], onUpload }, ref) => {
-  const [cards, setCards] = useState([]);
-  const [allImageUrls, setAllImageUrls] = useState(imageUrls);
-  const [isUploading, setIsUploading] = useState(false);
-  const imageUrlsRef = useRef(allImageUrls);
-  const [uploadingStatuses, setUploadingStatuses] = useState([]);
+// // const SliderWithBanner = forwardRef(({ imageUrls = [], onUpload }, ref) => {
+// //   const [cards, setCards] = useState([]);
+// //   const [allImageUrls, setAllImageUrls] = useState(imageUrls);
+// //   const [isUploading, setIsUploading] = useState(false);
+// //   const imageUrlsRef = useRef(allImageUrls);
+// //   const [uploadingStatuses, setUploadingStatuses] = useState([]);
 
-  // Memoize S3Client for Cloudflare R2
-  const s3 = useMemo(() => {
-    return new S3Client({
-      region: 'auto', // Cloudflare R2 does not require a specific region
-      endpoint: process.env.NEXT_PUBLIC_R2_ENDPOINT, // Your R2 endpoint
-      credentials: {
-        accessKeyId: process.env.NEXT_PUBLIC_R2_ACCESS_KEY_ID,
-        secretAccessKey: process.env.NEXT_PUBLIC_R2_SECRET_ACCESS_KEY,
-      },
-    });
-  }, []);
+// //   // Memoize S3Client for Cloudflare R2
+// //   const s3 = useMemo(() => {
+// //     return new S3Client({
+// //       region: 'auto', // Cloudflare R2 does not require a specific region
+// //       endpoint: process.env.NEXT_PUBLIC_R2_ENDPOINT, // Your R2 endpoint
+// //       credentials: {
+// //         accessKeyId: process.env.NEXT_PUBLIC_R2_ACCESS_KEY_ID,
+// //         secretAccessKey: process.env.NEXT_PUBLIC_R2_SECRET_ACCESS_KEY,
+// //       },
+// //     });
+// //   }, []);
 
-  useImperativeHandle(ref, () => ({
-    resetSlider() {
-      setCards([]);
-      setAllImageUrls([]);
-      imageUrlsRef.current = [];
-      onUpload([]);
-      setIsUploading(false); // Reset the uploading state when resetting
-    },
-    validateImages() {
-      if (imageUrlsRef.current.length === 0) {
-        toast.error('Please upload at least one image or video before submitting.');
-        return false;
-      }
-      return true;
-    },
-  }));
+// //   useImperativeHandle(ref, () => ({
+// //     resetSlider() {
+// //       setCards([]);
+// //       setAllImageUrls([]);
+// //       imageUrlsRef.current = [];
+// //       onUpload([]);
+// //       setIsUploading(false); // Reset the uploading state when resetting
+// //     },
+// //     validateImages() {
+// //       if (imageUrlsRef.current.length === 0) {
+// //         toast.error('Please upload at least one image or video before submitting.');
+// //         return false;
+// //       }
+// //       return true;
+// //     },
+// //   }));
 
-  useEffect(() => {
-    if (imageUrls.length > 0) {
-      const existingCards = imageUrls.map(url => ({
-        preview: url,
-        type: url.match(/\.(jpeg|jpg|gif|png|webp|jfif)$/i) ? 'image' : 'video',
-      }));
-      setCards(existingCards);
-      setAllImageUrls(imageUrls);
-      imageUrlsRef.current = imageUrls;
-    }
-  }, [imageUrls]);
+// //   useEffect(() => {
+// //     if (imageUrls.length > 0) {
+// //       const existingCards = imageUrls.map(url => ({
+// //         preview: url,
+// //         type: url.match(/\.(jpeg|jpg|gif|png|webp|jfif)$/i) ? 'image' : 'video',
+// //       }));
+// //       setCards(existingCards);
+// //       setAllImageUrls(imageUrls);
+// //       imageUrlsRef.current = imageUrls;
+// //     }
+// //   }, [imageUrls]);
 
-  const onDrop = useCallback(
-    async (acceptedFiles) => {
-      setIsUploading(true); // Start uploading state
-      const newImageUrls = [];
-      const newUploadingStatuses = [...uploadingStatuses];
+// //   const onDrop = useCallback(
+// //     async (acceptedFiles) => {
+// //       setIsUploading(true); // Start uploading state
+// //       const newImageUrls = [];
+// //       const newUploadingStatuses = [...uploadingStatuses];
 
-      const filePromises = acceptedFiles.map(async (file, index) => {
-        newUploadingStatuses[index] = true;
-        setUploadingStatuses([...newUploadingStatuses]);
+// //       const filePromises = acceptedFiles.map(async (file, index) => {
+// //         newUploadingStatuses[index] = true;
+// //         setUploadingStatuses([...newUploadingStatuses]);
 
-        // Check for file size
-        if (file.size > MAX_VIDEO_SIZE_MB) {
-          toast.error('File size exceeds 100MB. Please upload a smaller file.');
-          newUploadingStatuses[index] = false;
-          setUploadingStatuses([...newUploadingStatuses]);
-          return;
-        }
+// //         // Check for file size
+// //         if (file.size > MAX_VIDEO_SIZE_MB) {
+// //           toast.error('File size exceeds 100MB. Please upload a smaller file.');
+// //           newUploadingStatuses[index] = false;
+// //           setUploadingStatuses([...newUploadingStatuses]);
+// //           return;
+// //         }
 
-        try {
-          const uniqueFileName = `${crypto.randomUUID()}-${file.name}`; // Create a unique file name
+// //         try {
+// //           const uniqueFileName = `${crypto.randomUUID()}-${file.name}`; // Create a unique file name
 
-          // Create a new command to upload the file directly to R2
-          const uploadCommand = new PutObjectCommand({
-            Bucket: process.env.NEXT_PUBLIC_R2_BUCKET_NAME,
-            Key: uniqueFileName,
-            Body: file,
-            ContentType: file.type,
-            ACL: 'public-read', // Ensure the file is publicly accessible
-          });
+// //           // Create a new command to upload the file directly to R2
+// //           const uploadCommand = new PutObjectCommand({
+// //             Bucket: process.env.NEXT_PUBLIC_R2_BUCKET_NAME,
+// //             Key: uniqueFileName,
+// //             Body: file,
+// //             ContentType: file.type,
+// //             ACL: 'public-read', // Ensure the file is publicly accessible
+// //           });
 
-          // Upload the file directly to Cloudflare R2
-          await s3.send(uploadCommand);
+// //           // Upload the file directly to Cloudflare R2
+// //           await s3.send(uploadCommand);
 
-          // Generate the file URL after upload
-          const fileUrl = `${process.env.NEXT_PUBLIC_R2_ENDPOINT}/${uniqueFileName}`;
-          console.log('File uploaded successfully:', fileUrl);
+// //           // Generate the file URL after upload
+// //           const fileUrl = `${process.env.NEXT_PUBLIC_R2_ENDPOINT}/${uniqueFileName}`;
+// //           console.log('File uploaded successfully:', fileUrl);
 
-          newImageUrls.push(fileUrl);
+// //           newImageUrls.push(fileUrl);
 
-          // Update image URLs and cards
-          setAllImageUrls((prevUrls) => {
-            const updatedUrls = [...prevUrls, fileUrl];
-            imageUrlsRef.current = updatedUrls;
-            onUpload(updatedUrls); // Call the onUpload callback with the updated URLs
-            return updatedUrls;
-          });
+// //           // Update image URLs and cards
+// //           setAllImageUrls((prevUrls) => {
+// //             const updatedUrls = [...prevUrls, fileUrl];
+// //             imageUrlsRef.current = updatedUrls;
+// //             onUpload(updatedUrls); // Call the onUpload callback with the updated URLs
+// //             return updatedUrls;
+// //           });
 
-          setCards((prevCards) => [
-            ...prevCards,
-            { preview: URL.createObjectURL(file), type: file.type.includes('video') ? 'video' : 'image' },
-          ]);
+// //           setCards((prevCards) => [
+// //             ...prevCards,
+// //             { preview: URL.createObjectURL(file), type: file.type.includes('video') ? 'video' : 'image' },
+// //           ]);
 
-          toast.success(`File uploaded: ${file.name}`);
-        } catch (error) {
-          console.error('Error uploading file:', error);
-          toast.error(`Failed to upload ${file.name}`);
-        } finally {
-          newUploadingStatuses[index] = false;
-          setUploadingStatuses([...newUploadingStatuses]);
-        }
-      });
+// //           toast.success(`File uploaded: ${file.name}`);
+// //         } catch (error) {
+// //           console.error('Error uploading file:', error);
+// //           toast.error(`Failed to upload ${file.name}`);
+// //         } finally {
+// //           newUploadingStatuses[index] = false;
+// //           setUploadingStatuses([...newUploadingStatuses]);
+// //         }
+// //       });
 
-      await Promise.all(filePromises);
-      setIsUploading(false); // Stop the global loader after all files are processed
-    },
-    [onUpload, uploadingStatuses, s3]
-  );
+// //       await Promise.all(filePromises);
+// //       setIsUploading(false); // Stop the global loader after all files are processed
+// //     },
+// //     [onUpload, uploadingStatuses, s3]
+// //   );
 
-  const handleDeleteCard = (index) => {
-    const updatedCards = cards.filter((_, i) => i !== index);
-    const updatedImageUrls = allImageUrls.filter((_, i) => i !== index);
+// //   const handleDeleteCard = (index) => {
+// //     const updatedCards = cards.filter((_, i) => i !== index);
+// //     const updatedImageUrls = allImageUrls.filter((_, i) => i !== index);
 
-    setCards(updatedCards);
-    setAllImageUrls(updatedImageUrls);
-    imageUrlsRef.current = updatedImageUrls;
-    onUpload(updatedImageUrls);
-  };
+// //     setCards(updatedCards);
+// //     setAllImageUrls(updatedImageUrls);
+// //     imageUrlsRef.current = updatedImageUrls;
+// //     onUpload(updatedImageUrls);
+// //   };
 
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
-    onDrop,
-    accept: 'image/*,video/*', // Accept both images and videos
-  });
+// //   const { getRootProps, getInputProps, isDragActive } = useDropzone({
+// //     onDrop,
+// //     accept: 'image/*,video/*', // Accept both images and videos
+// //   });
 
-  return (
-    <div style={{ padding: '20px' }}>
-      <Grid container spacing={3}>
-        {cards.map((file, index) => (
-          <Grid item xs={12} sm={6} md={4} key={index}>
-            <BannnerCard
-              file={file}
-              onDelete={() => handleDeleteCard(index)}
-              onPreview={() => console.log('Preview image or video')}
-              isUploading={uploadingStatuses[index]} // Pass the correct uploading status
-            />
-          </Grid>
-        ))}
-        <Grid item xs={12} sm={6} md={4} className="min-h-[200px]">
-          <Card
-            sx={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              border: '2px dotted #ddd',
-              borderRadius: '12px',
-              cursor: isUploading ? 'not-allowed' : 'pointer',
-              minHeight: '200px',
-              padding: '16px',
-            }}
-            {...getRootProps()}
-          >
-            <input {...getInputProps()} />
-            {isUploading ? (
-              <CircularProgress />
-            ) : (
-              <>
-                {isDragActive ? <p>Drop the files here ...</p> : <p>Drag & Upload</p>}
-                <IoAddCircleSharp style={{ fontSize: '36px', color: '#4a90e2' }} />
-              </>
-            )}
-          </Card>
+// //   return (
+// //     <div style={{ padding: '20px' }}>
+// //       <Grid container spacing={3}>
+// //         {cards.map((file, index) => (
+// //           <Grid item xs={12} sm={6} md={4} key={index}>
+// //             <BannnerCard
+// //               file={file}
+// //               onDelete={() => handleDeleteCard(index)}
+// //               onPreview={() => console.log('Preview image or video')}
+// //               isUploading={uploadingStatuses[index]} // Pass the correct uploading status
+// //             />
+// //           </Grid>
+// //         ))}
+// //         <Grid item xs={12} sm={6} md={4} className="min-h-[200px]">
+// //           <Card
+// //             sx={{
+// //               display: 'flex',
+// //               alignItems: 'center',
+// //               justifyContent: 'center',
+// //               border: '2px dotted #ddd',
+// //               borderRadius: '12px',
+// //               cursor: isUploading ? 'not-allowed' : 'pointer',
+// //               minHeight: '200px',
+// //               padding: '16px',
+// //             }}
+// //             {...getRootProps()}
+// //           >
+// //             <input {...getInputProps()} />
+// //             {isUploading ? (
+// //               <CircularProgress />
+// //             ) : (
+// //               <>
+// //                 {isDragActive ? <p>Drop the files here ...</p> : <p>Drag & Upload</p>}
+// //                 <IoAddCircleSharp style={{ fontSize: '36px', color: '#4a90e2' }} />
+// //               </>
+// //             )}
+// //           </Card>
 
-        </Grid>
-      </Grid>
+// //         </Grid>
+// //       </Grid>
 
-      <style jsx global>{`
-        .modern-loader {
-          border: 8px solid rgba(0, 0, 0, 0.1);
-          border-radius: 50%;
-          border-top: 8px solid #4a90e2;
-          width: 60px;
-          height: 60px;
-          animation: spin 1.5s linear infinite;
-        }
+// //       <style jsx global>{`
+// //         .modern-loader {
+// //           border: 8px solid rgba(0, 0, 0, 0.1);
+// //           border-radius: 50%;
+// //           border-top: 8px solid #4a90e2;
+// //           width: 60px;
+// //           height: 60px;
+// //           animation: spin 1.5s linear infinite;
+// //         }
 
-        @keyframes spin {
-          0% {
-            transform: rotate(0deg);
-          }
-          100% {
-            transform: rotate(360deg);
-          }
-        }
-      `}</style>
-    </div>
-  )
-})
+// //         @keyframes spin {
+// //           0% {
+// //             transform: rotate(0deg);
+// //           }
+// //           100% {
+// //             transform: rotate(360deg);
+// //           }
+// //         }
+// //       `}</style>
+// //     </div>
+// //   )
+// // })
 
-export default SliderWithBanner
+// // export default SliderWithBanner
 
 // import { useState, useCallback, useEffect, forwardRef, useImperativeHandle, useRef } from 'react'
 // import Grid from '@mui/material/Grid'
